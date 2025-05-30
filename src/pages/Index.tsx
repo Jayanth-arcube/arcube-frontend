@@ -27,7 +27,7 @@ const carTransferSchema = z.object({
   carType: z.string().min(1, 'Please select a car type')
 });
 
-// API Types
+// API Types based on your response
 interface Ancillary {
   _id: string;
   id: string;
@@ -47,7 +47,100 @@ interface RecommendationResponse {
   airline: string;
 }
 
-const API_BASE_URL = 'http://localhost:3010';
+// Dummy data based on your API response
+const DUMMY_RECOMMENDATION: RecommendationResponse = {
+  "_id": "6839739e62d6013789bb8332",
+  "customer": {
+    "_id": "6838692fd902ff742d7682f2",
+    "email": "jayanth@arcube.com",
+    "phone": "7747156225",
+    "airline": "66c89890dbbb61d3b420f78e"
+  },
+  "ancillaries": [
+    {
+      "_id": "6839739e62d6013789bb8333",
+      "id": "681a25de5b03c53d0a0c9f6b",
+      "name": "Car Airport Transfer",
+      "description": "Arrive in style and convenience with our Car Airport Transfer service. Skip the hassle of finding transportation - we'll take you directly to your destination.",
+      "price": 20.7,
+      "image": "https://arcube-application.s3.eu-west-1.amazonaws.com/default/Ancillary+Thumbnails+-+New+batch/15%EF%BF%BD+Discount+on+Luxury+Sedan+Hire.png",
+      "category": "transportation",
+      "metadata": {
+        "provider": "mozio",
+        "partner_id": "6819d2dbbbc85b6782286d92",
+        "source": "partner-other"
+      }
+    },
+    {
+      "_id": "6839739e62d6013789bb8334",
+      "id": "68384222e5bc478e64f7c976",
+      "name": "Baggage Protection",
+      "description": "Travel worry-free with our Baggage Protection service! Safeguard your belongings against loss or damage, giving you peace of mind throughout your journey.",
+      "price": 6.6,
+      "image": "https://arcube-application.s3.eu-west-1.amazonaws.com/default/Ancillary+Thumbnails+-+New+batch/Additional+Carry-On+Bag.png",
+      "category": "insurance",
+      "metadata": {
+        "provider": "blueribbonbags",
+        "partner_id": "683840d2611b56bfb8608608",
+        "source": "partner-other"
+      }
+    },
+    {
+      "_id": "6839739e62d6013789bb8335",
+      "id": "68384222e5bc478e64f7c976",
+      "name": "GOLD SERVICE",
+      "description": "Premium travel insurance with comprehensive coverage. Protect yourself against trip cancellations, medical emergencies, and more.",
+      "price": 15.99,
+      "image": "https://arcube-application.s3.eu-west-1.amazonaws.com/default/Ancillary+Thumbnails+-+New+batch/Additional+Carry-On+Bag.png",
+      "category": "insurance",
+      "metadata": {
+        "provider": "blueribbonbags",
+        "source": "partner-brb"
+      }
+    },
+    {
+      "_id": "6839739e62d6013789bb8336",
+      "id": "lounge001",
+      "name": "Airport Lounge Access",
+      "description": "Enjoy premium comfort with access to exclusive airport lounges. Complimentary food, drinks, WiFi and quiet environment.",
+      "price": 45.00,
+      "image": "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400",
+      "category": "comfort",
+      "metadata": {
+        "provider": "lounge-access",
+        "source": "partner-other"
+      }
+    },
+    {
+      "_id": "6839739e62d6013789bb8337",
+      "id": "wifi001",
+      "name": "Premium WiFi",
+      "description": "Stay connected with high-speed internet throughout your flight. Stream, work, and browse without interruption.",
+      "price": 12.99,
+      "image": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400",
+      "category": "comfort",
+      "metadata": {
+        "provider": "wifi-provider",
+        "source": "partner-other"
+      }
+    }
+  ],
+  "flight": {
+    "_id": "66d5cee8c4edab185eb12d5f",
+    "flight_number": "BA075",
+    "departure_airport": {
+      "value": "LOS",
+      "label": "Lagos"
+    },
+    "arrival_airport": {
+      "value": "LHR",
+      "label": "London Heathrow"
+    },
+    "arrival_time": "17:00",
+    "departure_time": "11:55"
+  },
+  "airline": "66c89890dbbb61d3b420f78e"
+};
 
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -108,50 +201,19 @@ const Index = () => {
 
   const fetchRecommendation = async () => {
     setIsLoading(true);
-    console.log('Fetching recommendation for:', { email: formData.email, flight_number: formData.flightNumber });
+    console.log('Using dummy data for recommendation...');
     
-    try {
-      const requestBody: any = {
-        email: formData.email,
-        flight_number: formData.flightNumber
-      };
-
-      // Add car transfer details if opted in
-      if (formData.wantsCarTransfer === true && formData.pickupAddress && formData.dropoffAddress) {
-        requestBody.car_transfer_start_address = formData.pickupAddress;
-        requestBody.car_transfer_end_address = formData.dropoffAddress;
-        requestBody.num_passengers = parseInt(formData.passengers) || 1;
-        requestBody.car_transfer_pickup_datetime = `${formData.pickupDate}T${formData.pickupTime}`;
-      }
-
-      console.log('Request body:', requestBody);
-
-      const response = await fetch(`${API_BASE_URL}/aggregation-api/recommend`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Recommendation response:', data);
-      setRecommendation(data);
-      setCurrentStep(5);
-    } catch (error) {
-      console.error('Error fetching recommendation:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch recommendations. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
+    // Simulate API delay
+    setTimeout(() => {
+      setRecommendation(DUMMY_RECOMMENDATION);
       setIsLoading(false);
-    }
+      setCurrentStep(5);
+      
+      toast({
+        title: "Recommendations Loaded",
+        description: "Found personalized upgrades for your journey!",
+      });
+    }, 1500);
   };
 
   const handleNext = () => {
@@ -193,47 +255,17 @@ const Index = () => {
     }
 
     setIsLoading(true);
-    console.log('Placing order...');
+    console.log('Placing order with dummy data...');
 
-    try {
-      const orderPayload = {
-        recommendation: recommendation._id,
-        ancillaries: formData.selectedUpgrades,
-        email: formData.email
-      };
-
-      console.log('Order payload:', orderPayload);
-
-      const response = await fetch(`${API_BASE_URL}/aggregation-api/order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(orderPayload)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const orderResult = await response.json();
-      console.log('Order result:', orderResult);
-
+    // Simulate API delay
+    setTimeout(() => {
+      setIsLoading(false);
       toast({
         title: "Order Confirmed!",
         description: "Your travel upgrades have been successfully booked.",
       });
       setCurrentStep(8);
-    } catch (error) {
-      console.error('Error placing order:', error);
-      toast({
-        title: "Order Failed",
-        description: "Failed to place your order. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    }, 2000);
   };
 
   // Group ancillaries by category
@@ -662,6 +694,12 @@ const Index = () => {
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
             <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Processing your order...</p>
+            <Button 
+              onClick={placeOrder}
+              className="mt-6 bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl"
+            >
+              Confirm Order
+            </Button>
           </div>
         )}
 
