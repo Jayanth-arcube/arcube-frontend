@@ -163,6 +163,7 @@ const Index = () => {
   const [formData, setFormData] = useState({
     email: '',
     flightNumber: '',
+    needsTransport: null as boolean | null,
     pickupAddress: '',
     dropoffAddress: '',
     passengers: '',
@@ -185,14 +186,23 @@ const Index = () => {
           flightSchema.parse({ flightNumber: formData.flightNumber });
           break;
         case 3:
-          carTransferSchema.parse({
-            pickupAddress: formData.pickupAddress,
-            dropoffAddress: formData.dropoffAddress,
-            passengers: formData.passengers,
-            pickupDate: formData.pickupDate,
-            pickupTime: formData.pickupTime,
-            carType: formData.carType
-          });
+          // Transport inquiry step - just check if choice is made
+          if (formData.needsTransport === null) {
+            setErrors({ needsTransport: 'Please select an option' });
+            return false;
+          }
+          break;
+        case 4:
+          if (formData.needsTransport) {
+            carTransferSchema.parse({
+              pickupAddress: formData.pickupAddress,
+              dropoffAddress: formData.dropoffAddress,
+              passengers: formData.passengers,
+              pickupDate: formData.pickupDate,
+              pickupTime: formData.pickupTime,
+              carType: formData.carType
+            });
+          }
           break;
       }
       return true;
@@ -218,7 +228,7 @@ const Index = () => {
     setTimeout(() => {
       setRecommendation(DUMMY_RECOMMENDATION);
       setIsLoading(false);
-      setCurrentStep(4); // Go to sections overview
+      setCurrentStep(5); // Go to sections overview
       
       toast({
         title: "Recommendations Loaded",
@@ -230,9 +240,15 @@ const Index = () => {
   const handleNext = () => {
     if (validateStep(currentStep)) {
       if (currentStep === 2) {
-        setCurrentStep(3); // Go to car transfer details
+        setCurrentStep(3); // Go to transport inquiry
       } else if (currentStep === 3) {
-        fetchRecommendation(); // Fetch recommendations after car transfer details
+        if (formData.needsTransport) {
+          setCurrentStep(4); // Go to transport details
+        } else {
+          fetchRecommendation(); // Skip transport details, go to upgrades
+        }
+      } else if (currentStep === 4) {
+        fetchRecommendation(); // Fetch recommendations after transport details
       } else {
         setCurrentStep(currentStep + 1);
       }
@@ -271,7 +287,7 @@ const Index = () => {
         title: "Order Confirmed!",
         description: "Your travel upgrades have been successfully booked.",
       });
-      setCurrentStep(6); // Go to confirmation
+      setCurrentStep(7); // Go to confirmation
     }, 2000);
   };
 
@@ -316,7 +332,7 @@ const Index = () => {
   };
 
   const renderProgressDots = () => {
-    const totalSteps = 4;
+    const totalSteps = 5;
     const currentStepIndex = Math.min(currentStep - 1, totalSteps - 1);
     
     return (
@@ -334,12 +350,12 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-400 via-fuchsia-500 to-pink-500">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-6">
+      <div className="bg-gradient-to-r from-slate-700 to-blue-700 text-white p-6">
         <div className="flex justify-between items-center max-w-6xl mx-auto">
           <h1 className="text-2xl font-bold">Enhance Your Journey</h1>
-          {(currentStep >= 4) && (
+          {(currentStep >= 5) && (
             <div className="text-sm">
               <span className="mr-4">📧 {formData.email}</span>
               <span>✈️ {formData.flightNumber}</span>
@@ -349,13 +365,13 @@ const Index = () => {
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-12">
-        {currentStep < 6 && renderProgressDots()}
+        {currentStep < 7 && renderProgressDots()}
 
         {/* Step 1: Email Capture */}
         {currentStep === 1 && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
             <div className="mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-slate-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
                 <Plane className="w-10 h-10 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-gray-800 mb-4">Personalize Your Travel</h2>
@@ -376,7 +392,7 @@ const Index = () => {
               
               <Button 
                 onClick={handleNext}
-                className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
+                className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-slate-700 hover:from-blue-700 hover:to-slate-800 rounded-2xl"
               >
                 Continue
               </Button>
@@ -388,7 +404,7 @@ const Index = () => {
         {currentStep === 2 && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
             <div className="mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-blue-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
                 <Ticket className="w-10 h-10 text-white" />
               </div>
               <h2 className="text-3xl font-bold text-gray-800 mb-4">Flight Details</h2>
@@ -401,26 +417,26 @@ const Index = () => {
                 <p className="text-gray-800 font-medium">{formData.email}</p>
                 <button 
                   onClick={() => setCurrentStep(1)}
-                  className="text-purple-600 text-sm mt-1"
+                  className="text-blue-600 text-sm mt-1 hover:underline"
                 >
                   Change email
                 </button>
               </div>
 
               <div>
-                <Label className="text-purple-600 font-medium">Flight Number</Label>
+                <Label className="text-blue-600 font-medium">Flight Number</Label>
                 <Input
                   placeholder="BA075"
                   value={formData.flightNumber}
                   onChange={(e) => setFormData({ ...formData, flightNumber: e.target.value.toUpperCase() })}
-                  className="h-14 text-lg border-2 border-purple-300 rounded-2xl mt-2"
+                  className="h-14 text-lg border-2 border-blue-300 rounded-2xl mt-2"
                 />
                 {errors.flightNumber && <p className="text-red-500 text-sm mt-2">{errors.flightNumber}</p>}
               </div>
 
               <Button 
                 onClick={handleNext}
-                className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
+                className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-slate-700 hover:from-blue-700 hover:to-slate-800 rounded-2xl"
               >
                 Continue
               </Button>
@@ -430,8 +446,72 @@ const Index = () => {
           </div>
         )}
 
-        {/* Step 3: Car Transfer Details */}
+        {/* Step 3: Transport Service Inquiry */}
         {currentStep === 3 && (
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
+            <div className="mb-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl mx-auto mb-6 flex items-center justify-center">
+                <Car className="w-10 h-10 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">Transport Service</h2>
+              <p className="text-gray-600 text-lg">Do you need airport transfer service?</p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex justify-center space-x-8 text-sm text-gray-600 mb-6">
+                <div className="text-center">
+                  <span className="block text-gray-500 uppercase tracking-wide">EMAIL</span>
+                  <span className="font-medium">{formData.email}</span>
+                </div>
+                <div className="text-center">
+                  <span className="block text-gray-500 uppercase tracking-wide">FLIGHT</span>
+                  <span className="font-medium">{formData.flightNumber}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setFormData({ ...formData, needsTransport: true })}
+                  className={`p-6 border-2 rounded-2xl transition-all ${
+                    formData.needsTransport === true 
+                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                      : 'border-gray-300 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-4xl mb-2">🚗</div>
+                  <h3 className="font-semibold">Yes, I need transfer</h3>
+                  <p className="text-sm text-gray-600 mt-2">Get convenient airport pickup</p>
+                </button>
+
+                <button
+                  onClick={() => setFormData({ ...formData, needsTransport: false })}
+                  className={`p-6 border-2 rounded-2xl transition-all ${
+                    formData.needsTransport === false 
+                      ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                      : 'border-gray-300 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-4xl mb-2">❌</div>
+                  <h3 className="font-semibold">No, thanks</h3>
+                  <p className="text-sm text-gray-600 mt-2">I have my own transport</p>
+                </button>
+              </div>
+
+              {errors.needsTransport && <p className="text-red-500 text-sm">{errors.needsTransport}</p>}
+
+              <Button 
+                onClick={handleNext}
+                disabled={formData.needsTransport === null}
+                className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-slate-700 hover:from-blue-700 hover:to-slate-800 rounded-2xl disabled:bg-gray-400"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Car Transfer Details (only if needed) */}
+        {currentStep === 4 && formData.needsTransport && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 shadow-2xl">
             <div className="mb-8 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl mx-auto mb-6 flex items-center justify-center">
@@ -454,7 +534,7 @@ const Index = () => {
               </div>
 
               <div>
-                <Label className="text-purple-600 font-medium">Pickup Address</Label>
+                <Label className="text-blue-600 font-medium">Pickup Address</Label>
                 <Input
                   placeholder="e.g., London Heathrow Airport"
                   value={formData.pickupAddress}
@@ -465,7 +545,7 @@ const Index = () => {
               </div>
 
               <div>
-                <Label className="text-purple-600 font-medium">Drop-off Address</Label>
+                <Label className="text-blue-600 font-medium">Drop-off Address</Label>
                 <Input
                   placeholder="e.g., Hotel or destination address"
                   value={formData.dropoffAddress}
@@ -476,7 +556,7 @@ const Index = () => {
               </div>
 
               <div>
-                <Label className="text-purple-600 font-medium">Number of Passengers</Label>
+                <Label className="text-blue-600 font-medium">Number of Passengers</Label>
                 <Input
                   type="number"
                   placeholder="1"
@@ -490,7 +570,7 @@ const Index = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-purple-600 font-medium">Pickup Date</Label>
+                  <Label className="text-blue-600 font-medium">Pickup Date</Label>
                   <Input
                     type="date"
                     value={formData.pickupDate}
@@ -500,7 +580,7 @@ const Index = () => {
                   {errors.pickupDate && <p className="text-red-500 text-sm mt-1">{errors.pickupDate}</p>}
                 </div>
                 <div>
-                  <Label className="text-purple-600 font-medium">Pickup Time</Label>
+                  <Label className="text-blue-600 font-medium">Pickup Time</Label>
                   <Input
                     type="time"
                     value={formData.pickupTime}
@@ -512,7 +592,7 @@ const Index = () => {
               </div>
 
               <div>
-                <Label className="text-purple-600 font-medium">Car Type</Label>
+                <Label className="text-blue-600 font-medium">Car Type</Label>
                 <Select value={formData.carType} onValueChange={(value) => setFormData({ ...formData, carType: value })}>
                   <SelectTrigger className="h-12 rounded-xl mt-2">
                     <SelectValue placeholder="Choose car type" />
@@ -530,7 +610,7 @@ const Index = () => {
               <Button 
                 onClick={handleNext}
                 disabled={isLoading}
-                className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
+                className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-slate-700 hover:from-blue-700 hover:to-slate-800 rounded-2xl"
               >
                 {isLoading ? 'Finding Upgrades...' : 'Find My Upgrades'}
               </Button>
@@ -538,8 +618,8 @@ const Index = () => {
           </div>
         )}
 
-        {/* Step 4: Upgrade Sections Overview */}
-        {currentStep === 4 && !currentSection && recommendation && (
+        {/* Step 5: Upgrade Sections Overview */}
+        {currentStep === 5 && !currentSection && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
             <div className="mb-8 text-center">
               <h2 className="text-3xl font-bold text-gray-800 mb-2">Choose Your Upgrades</h2>
@@ -550,7 +630,7 @@ const Index = () => {
               {getCategories().map(([category, ancillaries]) => (
                 <Card 
                   key={category} 
-                  className="p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer"
+                  className="p-6 border-2 hover:border-blue-300 transition-colors cursor-pointer hover:shadow-lg"
                   onClick={() => setCurrentSection(category)}
                 >
                   <CardContent className="p-0 text-center">
@@ -559,7 +639,7 @@ const Index = () => {
                     </div>
                     <h3 className="text-xl font-bold text-gray-800 mb-2 capitalize">{category}</h3>
                     <p className="text-gray-600 text-sm mb-4">{ancillaries.length} item{ancillaries.length !== 1 ? 's' : ''} available</p>
-                    <p className="text-purple-600 font-semibold">Explore →</p>
+                    <p className="text-blue-600 font-semibold">Explore →</p>
                   </CardContent>
                 </Card>
               ))}
@@ -568,12 +648,12 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <div>
                 <span className="text-gray-500">Total Selected</span>
-                <p className="text-2xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-blue-600">${calculateTotal().toFixed(2)}</p>
               </div>
               <Button 
-                onClick={() => setCurrentStep(5)}
+                onClick={() => setCurrentStep(6)}
                 disabled={formData.selectedUpgrades.length === 0}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
               >
                 Review Order ({formData.selectedUpgrades.length})
               </Button>
@@ -581,14 +661,14 @@ const Index = () => {
           </div>
         )}
 
-        {/* Step 4: Specific Section Items */}
-        {currentStep === 4 && currentSection && recommendation && (
+        {/* Step 5: Specific Section Items */}
+        {currentStep === 5 && currentSection && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
             <div className="mb-6">
               <Button 
                 onClick={() => setCurrentSection(null)}
                 variant="outline"
-                className="mb-4 rounded-2xl"
+                className="mb-4 rounded-2xl border-blue-300 text-blue-600 hover:bg-blue-50"
               >
                 ← Back to Categories
               </Button>
@@ -601,8 +681,8 @@ const Index = () => {
                 .map((ancillary) => (
                 <Card 
                   key={ancillary._id}
-                  className={`p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer ${
-                    formData.selectedUpgrades.includes(ancillary._id) ? 'border-purple-500 bg-purple-50' : ''
+                  className={`p-6 border-2 hover:border-blue-300 transition-colors cursor-pointer ${
+                    formData.selectedUpgrades.includes(ancillary._id) ? 'border-blue-500 bg-blue-50' : ''
                   }`}
                   onClick={() => handleUpgradeToggle(ancillary._id)}
                 >
@@ -629,7 +709,7 @@ const Index = () => {
                       <p className="text-gray-600 text-sm">{ancillary.description}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-purple-600">${ancillary.price.toFixed(2)}</p>
+                      <p className="text-2xl font-bold text-blue-600">${ancillary.price.toFixed(2)}</p>
                       {formData.selectedUpgrades.includes(ancillary._id) && (
                         <span className="text-green-600 font-semibold text-sm">✓ Selected</span>
                       )}
@@ -642,12 +722,12 @@ const Index = () => {
             <div className="flex justify-between items-center">
               <div>
                 <span className="text-gray-500">Total Selected</span>
-                <p className="text-2xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</p>
+                <p className="text-2xl font-bold text-blue-600">${calculateTotal().toFixed(2)}</p>
               </div>
               <Button 
-                onClick={() => setCurrentStep(5)}
+                onClick={() => setCurrentStep(6)}
                 disabled={formData.selectedUpgrades.length === 0}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
               >
                 Review Order ({formData.selectedUpgrades.length})
               </Button>
@@ -655,14 +735,14 @@ const Index = () => {
           </div>
         )}
 
-        {/* Step 5: Order Review */}
-        {currentStep === 5 && recommendation && (
+        {/* Step 6: Order Review */}
+        {currentStep === 6 && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
             <div className="mb-6">
               <Button 
-                onClick={() => setCurrentStep(4)}
+                onClick={() => setCurrentStep(5)}
                 variant="outline"
-                className="mb-4 rounded-2xl"
+                className="mb-4 rounded-2xl border-blue-300 text-blue-600 hover:bg-blue-50"
               >
                 ← Back to Upgrades
               </Button>
@@ -681,7 +761,7 @@ const Index = () => {
                       <p className="text-sm text-gray-600 capitalize">{ancillary.category}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-purple-600">${ancillary.price.toFixed(2)}</p>
+                      <p className="font-bold text-blue-600">${ancillary.price.toFixed(2)}</p>
                       <button 
                         onClick={() => handleUpgradeToggle(upgradeId)}
                         className="text-red-500 text-sm hover:underline"
@@ -697,13 +777,13 @@ const Index = () => {
             <div className="border-t pt-6">
               <div className="flex justify-between items-center mb-6">
                 <span className="text-xl font-semibold">Total</span>
-                <span className="text-3xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</span>
+                <span className="text-3xl font-bold text-blue-600">${calculateTotal().toFixed(2)}</span>
               </div>
               
               <Button 
                 onClick={placeOrder}
                 disabled={isLoading}
-                className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
+                className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-slate-700 hover:from-blue-700 hover:to-slate-800 rounded-2xl"
               >
                 {isLoading ? 'Processing Order...' : 'Place Order'}
               </Button>
@@ -711,9 +791,9 @@ const Index = () => {
           </div>
         )}
 
-        {/* Step 6: Order Confirmation */}
-        {currentStep === 6 && (
-          <div className="bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-3xl p-12 text-center shadow-2xl">
+        {/* Step 7: Order Confirmation */}
+        {currentStep === 7 && (
+          <div className="bg-gradient-to-br from-slate-700 to-blue-700 text-white rounded-3xl p-12 text-center shadow-2xl">
             <div className="mb-8">
               <CheckCircle className="w-20 h-20 text-green-400 mx-auto mb-6" />
               <h2 className="text-4xl font-bold mb-4">Thank You!</h2>
@@ -749,6 +829,7 @@ const Index = () => {
                 setFormData({
                   email: '',
                   flightNumber: '',
+                  needsTransport: null,
                   pickupAddress: '',
                   dropoffAddress: '',
                   passengers: '',
@@ -758,7 +839,7 @@ const Index = () => {
                   selectedUpgrades: []
                 });
               }}
-              className="bg-white text-purple-600 hover:bg-gray-100 h-14 px-8 rounded-2xl font-semibold"
+              className="bg-white text-slate-700 hover:bg-gray-100 h-14 px-8 rounded-2xl font-semibold"
             >
               Start New Booking
             </Button>
