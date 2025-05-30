@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,8 +27,32 @@ const carTransferSchema = z.object({
   carType: z.string().min(1, 'Please select a car type')
 });
 
+// API Types
+interface Ancillary {
+  _id: string;
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  category: string;
+  metadata?: any;
+}
+
+interface RecommendationResponse {
+  _id: string;
+  customer: any;
+  ancillaries: Ancillary[];
+  flight: any;
+  airline: string;
+}
+
+const API_BASE_URL = 'http://localhost:3010';
+
 const Index = () => {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     flightNumber: '',
@@ -82,9 +106,62 @@ const Index = () => {
     }
   };
 
+  const fetchRecommendation = async () => {
+    setIsLoading(true);
+    console.log('Fetching recommendation for:', { email: formData.email, flight_number: formData.flightNumber });
+    
+    try {
+      const requestBody: any = {
+        email: formData.email,
+        flight_number: formData.flightNumber
+      };
+
+      // Add car transfer details if opted in
+      if (formData.wantsCarTransfer === true && formData.pickupAddress && formData.dropoffAddress) {
+        requestBody.car_transfer_start_address = formData.pickupAddress;
+        requestBody.car_transfer_end_address = formData.dropoffAddress;
+        requestBody.num_passengers = parseInt(formData.passengers) || 1;
+        requestBody.car_transfer_pickup_datetime = `${formData.pickupDate}T${formData.pickupTime}`;
+      }
+
+      console.log('Request body:', requestBody);
+
+      const response = await fetch(`${API_BASE_URL}/aggregation-api/recommend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Recommendation response:', data);
+      setRecommendation(data);
+      setCurrentStep(5);
+    } catch (error) {
+      console.error('Error fetching recommendation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch recommendations. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(currentStep + 1);
+      if (currentStep === 2) {
+        // After flight number, fetch recommendations
+        fetchRecommendation();
+      } else {
+        setCurrentStep(currentStep + 1);
+      }
     }
   };
 
@@ -93,7 +170,8 @@ const Index = () => {
     if (wants) {
       setCurrentStep(4);
     } else {
-      setCurrentStep(5);
+      // Skip car transfer details and fetch recommendations
+      fetchRecommendation();
     }
   };
 
@@ -104,16 +182,96 @@ const Index = () => {
     setFormData({ ...formData, selectedUpgrades: newUpgrades });
   };
 
-  const completeOrder = () => {
-    toast({
-      title: "Order Confirmed!",
-      description: "Your travel upgrades have been successfully booked.",
-    });
-    setCurrentStep(8);
+  const placeOrder = async () => {
+    if (!recommendation || formData.selectedUpgrades.length === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select at least one upgrade to continue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    console.log('Placing order...');
+
+    try {
+      const orderPayload = {
+        recommendation: recommendation._id,
+        ancillaries: formData.selectedUpgrades,
+        email: formData.email
+      };
+
+      console.log('Order payload:', orderPayload);
+
+      const response = await fetch(`${API_BASE_URL}/aggregation-api/order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderPayload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const orderResult = await response.json();
+      console.log('Order result:', orderResult);
+
+      toast({
+        title: "Order Confirmed!",
+        description: "Your travel upgrades have been successfully booked.",
+      });
+      setCurrentStep(8);
+    } catch (error) {
+      console.error('Error placing order:', error);
+      toast({
+        title: "Order Failed",
+        description: "Failed to place your order. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // Group ancillaries by category
+  const getCategories = () => {
+    if (!recommendation?.ancillaries) return [];
+    
+    const categories = recommendation.ancillaries.reduce((acc: Record<string, Ancillary[]>, ancillary) => {
+      const category = ancillary.category || 'other';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(ancillary);
+      return acc;
+    }, {});
+    
+    return Object.entries(categories);
+  };
+
+  const calculateTotal = () => {
+    if (!recommendation?.ancillaries) return 0;
+    
+    return formData.selectedUpgrades.reduce((total, upgradeId) => {
+      const ancillary = recommendation.ancillaries.find(a => a._id === upgradeId);
+      return total + (ancillary?.price || 0);
+    }, 0);
+  };
+
+  // Auto-progress from loading step
+  useEffect(() => {
+    if (currentStep === 7) {
+      const timer = setTimeout(() => {
+        setCurrentStep(8);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
+
   const renderProgressDots = () => {
-    const totalSteps = 8;
     return (
       <div className="flex justify-center mb-8">
         {Array.from({ length: 3 }, (_, i) => (
@@ -194,7 +352,12 @@ const Index = () => {
               <div className="text-center">
                 <Label className="text-sm text-gray-500 uppercase tracking-wide">EMAIL</Label>
                 <p className="text-gray-800 font-medium">{formData.email}</p>
-                <button className="text-purple-600 text-sm mt-1">Change email</button>
+                <button 
+                  onClick={() => setCurrentStep(1)}
+                  className="text-purple-600 text-sm mt-1"
+                >
+                  Change email
+                </button>
               </div>
 
               <div>
@@ -210,9 +373,10 @@ const Index = () => {
 
               <Button 
                 onClick={handleNext}
+                disabled={isLoading}
                 className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
               >
-                Find My Upgrades
+                {isLoading ? 'Finding Upgrades...' : 'Find My Upgrades'}
               </Button>
 
               <p className="text-blue-500 text-sm">📄 Example: BA204 or AA1234</p>
@@ -243,8 +407,18 @@ const Index = () => {
                 </div>
               </div>
               <div className="text-center space-x-2">
-                <button className="text-purple-600 text-sm">Change email</button>
-                <button className="text-purple-600 text-sm">Change flight</button>
+                <button 
+                  onClick={() => setCurrentStep(1)}
+                  className="text-purple-600 text-sm"
+                >
+                  Change email
+                </button>
+                <button 
+                  onClick={() => setCurrentStep(2)}
+                  className="text-purple-600 text-sm"
+                >
+                  Change flight
+                </button>
               </div>
             </div>
 
@@ -282,12 +456,22 @@ const Index = () => {
                 <div className="text-center">
                   <span className="block text-gray-500 uppercase tracking-wide">EMAIL</span>
                   <span className="font-medium">{formData.email}</span>
-                  <button className="block text-purple-600 text-sm mt-1">Change email</button>
+                  <button 
+                    onClick={() => setCurrentStep(1)}
+                    className="block text-purple-600 text-sm mt-1"
+                  >
+                    Change email
+                  </button>
                 </div>
                 <div className="text-center">
                   <span className="block text-gray-500 uppercase tracking-wide">FLIGHT</span>
                   <span className="font-medium">{formData.flightNumber}</span>
-                  <button className="block text-purple-600 text-sm mt-1">Change flight</button>
+                  <button 
+                    onClick={() => setCurrentStep(2)}
+                    className="block text-purple-600 text-sm mt-1"
+                  >
+                    Change flight
+                  </button>
                 </div>
               </div>
 
@@ -363,50 +547,45 @@ const Index = () => {
               </div>
 
               <Button 
-                onClick={handleNext}
+                onClick={fetchRecommendation}
+                disabled={isLoading}
                 className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
               >
-                Confirm Transfer Details
+                {isLoading ? 'Finding Upgrades...' : 'Confirm Transfer Details'}
               </Button>
             </div>
           </div>
         )}
 
-        {/* Step 5: Upgrade Categories */}
-        {currentStep === 5 && (
+        {/* Step 5: Dynamic Upgrade Categories */}
+        {currentStep === 5 && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
-            <div className="grid grid-cols-3 gap-6 mb-8">
-              <div className="text-center">
-                <h3 className="text-purple-600 font-semibold mb-2">esim</h3>
-                <p className="text-gray-500 text-sm">5 items</p>
-              </div>
-              <div className="text-center">
-                <h3 className="text-purple-600 font-semibold mb-2">insurance</h3>
-                <p className="text-gray-500 text-sm">2 items</p>
-              </div>
-              <div className="text-center">
-                <h3 className="text-purple-600 font-semibold mb-2">transportation</h3>
-                <p className="text-gray-500 text-sm">1 item</p>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {getCategories().map(([category, ancillaries]) => (
+                <div key={category} className="text-center">
+                  <h3 className="text-purple-600 font-semibold mb-2 capitalize">{category}</h3>
+                  <p className="text-gray-500 text-sm">{ancillaries.length} item{ancillaries.length !== 1 ? 's' : ''}</p>
+                </div>
+              ))}
             </div>
             
             <div className="flex justify-between items-center">
               <div>
                 <span className="text-gray-500">Total</span>
-                <p className="text-2xl font-bold text-purple-600">$0.00</p>
+                <p className="text-2xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</p>
               </div>
               <Button 
                 onClick={() => setCurrentStep(6)}
-                className="bg-gray-400 hover:bg-gray-500 text-white px-8 py-3 rounded-2xl"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl"
               >
-                Complete Order
+                View Upgrades
               </Button>
             </div>
           </div>
         )}
 
         {/* Step 6: Specific Upgrades */}
-        {currentStep === 6 && (
+        {currentStep === 6 && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
             <Button 
               onClick={() => setCurrentStep(5)}
@@ -417,37 +596,60 @@ const Index = () => {
             </Button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <Card className="p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer" onClick={() => handleUpgradeToggle('baggage')}>
-                <CardContent className="p-0 text-center">
-                  <div className="w-16 h-16 bg-blue-100 rounded-xl mx-auto mb-4 flex items-center justify-center">
-                    <Shield className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <h3 className="font-bold text-gray-800 mb-2">Baggage Protection</h3>
-                  <p className="text-gray-600 text-sm mb-4">Travel worry-free with our Baggage Protection service! Safeguard your belongings against loss or damage, giving you peace of mind throughout your journey.</p>
-                  <p className="text-2xl font-bold text-purple-600">$6.50</p>
-                </CardContent>
-              </Card>
-
-              <Card className="p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer" onClick={() => handleUpgradeToggle('gold')}>
-                <CardContent className="p-0 text-center">
-                  <div className="w-16 h-16 bg-blue-100 rounded-xl mx-auto mb-4 flex items-center justify-center">
-                    <Star className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <h3 className="font-bold text-gray-800 mb-2">GOLD SERVICE</h3>
-                  <p className="text-gray-600 text-sm mb-4">Travel worry-free with our Baggage Protection service! Safeguard your belongings against loss or damage, giving you peace of mind throughout your journey.</p>
-                  <p className="text-2xl font-bold text-purple-600">$5.00</p>
-                </CardContent>
-              </Card>
+              {recommendation.ancillaries.map((ancillary) => (
+                <Card 
+                  key={ancillary._id}
+                  className={`p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer ${
+                    formData.selectedUpgrades.includes(ancillary._id) ? 'border-purple-500 bg-purple-50' : ''
+                  }`}
+                  onClick={() => handleUpgradeToggle(ancillary._id)}
+                >
+                  <CardContent className="p-0 text-center">
+                    <div className="w-16 h-16 bg-blue-100 rounded-xl mx-auto mb-4 flex items-center justify-center overflow-hidden">
+                      {ancillary.image ? (
+                        <img 
+                          src={ancillary.image} 
+                          alt={ancillary.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={ancillary.image ? 'hidden' : ''}>
+                        {ancillary.category === 'insurance' ? (
+                          <Shield className="w-8 h-8 text-blue-600" />
+                        ) : ancillary.category === 'transportation' ? (
+                          <Car className="w-8 h-8 text-blue-600" />
+                        ) : (
+                          <Star className="w-8 h-8 text-blue-600" />
+                        )}
+                      </div>
+                    </div>
+                    <h3 className="font-bold text-gray-800 mb-2">{ancillary.name}</h3>
+                    <p className="text-gray-600 text-sm mb-4">{ancillary.description}</p>
+                    <p className="text-2xl font-bold text-purple-600">${ancillary.price.toFixed(2)}</p>
+                    {formData.selectedUpgrades.includes(ancillary._id) && (
+                      <div className="mt-2">
+                        <span className="text-green-600 font-semibold">✓ Selected</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             <div className="flex justify-between items-center">
               <div>
                 <span className="text-gray-500">Total</span>
-                <p className="text-2xl font-bold text-purple-600">$0.00</p>
+                <p className="text-2xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</p>
               </div>
               <Button 
                 onClick={() => setCurrentStep(7)}
-                className="bg-gray-400 hover:bg-gray-500 text-white px-8 py-3 rounded-2xl"
+                disabled={formData.selectedUpgrades.length === 0}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
               >
                 Complete Order
               </Button>
@@ -460,7 +662,6 @@ const Index = () => {
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
             <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-600">Processing your order...</p>
-            {setTimeout(() => completeOrder(), 2000)}
           </div>
         )}
 
@@ -476,12 +677,20 @@ const Index = () => {
             <div className="bg-white/10 rounded-2xl p-6 mb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
                 <div>
-                  <span className="text-white/70">Order #:</span>
-                  <p className="font-semibold">Order placed successfully</p>
+                  <span className="text-white/70">Total Amount:</span>
+                  <p className="font-semibold">${calculateTotal().toFixed(2)}</p>
                 </div>
                 <div>
                   <span className="text-white/70">Email:</span>
                   <p className="font-semibold">{formData.email}</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Flight:</span>
+                  <p className="font-semibold">{formData.flightNumber}</p>
+                </div>
+                <div>
+                  <span className="text-white/70">Items:</span>
+                  <p className="font-semibold">{formData.selectedUpgrades.length} upgrade{formData.selectedUpgrades.length !== 1 ? 's' : ''}</p>
                 </div>
               </div>
             </div>
@@ -489,6 +698,7 @@ const Index = () => {
             <Button 
               onClick={() => {
                 setCurrentStep(1);
+                setRecommendation(null);
                 setFormData({
                   email: '',
                   flightNumber: '',
@@ -504,7 +714,7 @@ const Index = () => {
               }}
               className="bg-white text-purple-600 hover:bg-gray-100 h-14 px-8 rounded-2xl font-semibold"
             >
-              Continue
+              Start New Booking
             </Button>
           </div>
         )}
