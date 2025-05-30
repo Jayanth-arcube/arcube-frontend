@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plane, Ticket, Car, FileText, CheckCircle, Shield, Star } from 'lucide-react';
+import { Plane, Ticket, Car, FileText, CheckCircle, Shield, Star, Wifi, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // Validation schemas
@@ -123,6 +123,19 @@ const DUMMY_RECOMMENDATION: RecommendationResponse = {
         "provider": "wifi-provider",
         "source": "partner-other"
       }
+    },
+    {
+      "_id": "6839739e62d6013789bb8338",
+      "id": "esim001",
+      "name": "Global eSIM Data",
+      "description": "Stay connected worldwide with our global eSIM data plans. No roaming charges, instant activation.",
+      "price": 24.99,
+      "image": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=400",
+      "category": "esim",
+      "metadata": {
+        "provider": "esim-global",
+        "source": "partner-other"
+      }
     }
   ],
   "flight": {
@@ -146,10 +159,10 @@ const Index = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null);
+  const [currentSection, setCurrentSection] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     flightNumber: '',
-    wantsCarTransfer: null as boolean | null,
     pickupAddress: '',
     dropoffAddress: '',
     passengers: '',
@@ -171,17 +184,15 @@ const Index = () => {
         case 2:
           flightSchema.parse({ flightNumber: formData.flightNumber });
           break;
-        case 4:
-          if (formData.wantsCarTransfer) {
-            carTransferSchema.parse({
-              pickupAddress: formData.pickupAddress,
-              dropoffAddress: formData.dropoffAddress,
-              passengers: formData.passengers,
-              pickupDate: formData.pickupDate,
-              pickupTime: formData.pickupTime,
-              carType: formData.carType
-            });
-          }
+        case 3:
+          carTransferSchema.parse({
+            pickupAddress: formData.pickupAddress,
+            dropoffAddress: formData.dropoffAddress,
+            passengers: formData.passengers,
+            pickupDate: formData.pickupDate,
+            pickupTime: formData.pickupTime,
+            carType: formData.carType
+          });
           break;
       }
       return true;
@@ -207,7 +218,7 @@ const Index = () => {
     setTimeout(() => {
       setRecommendation(DUMMY_RECOMMENDATION);
       setIsLoading(false);
-      setCurrentStep(5);
+      setCurrentStep(4); // Go to sections overview
       
       toast({
         title: "Recommendations Loaded",
@@ -219,21 +230,12 @@ const Index = () => {
   const handleNext = () => {
     if (validateStep(currentStep)) {
       if (currentStep === 2) {
-        // After flight number, fetch recommendations
-        fetchRecommendation();
+        setCurrentStep(3); // Go to car transfer details
+      } else if (currentStep === 3) {
+        fetchRecommendation(); // Fetch recommendations after car transfer details
       } else {
         setCurrentStep(currentStep + 1);
       }
-    }
-  };
-
-  const handleCarTransferDecision = (wants: boolean) => {
-    setFormData({ ...formData, wantsCarTransfer: wants });
-    if (wants) {
-      setCurrentStep(4);
-    } else {
-      // Skip car transfer details and fetch recommendations
-      fetchRecommendation();
     }
   };
 
@@ -256,6 +258,11 @@ const Index = () => {
 
     setIsLoading(true);
     console.log('Placing order with dummy data...');
+    console.log('Order payload:', {
+      recommendation: recommendation._id,
+      ancillaries: formData.selectedUpgrades,
+      email: formData.email
+    });
 
     // Simulate API delay
     setTimeout(() => {
@@ -264,7 +271,7 @@ const Index = () => {
         title: "Order Confirmed!",
         description: "Your travel upgrades have been successfully booked.",
       });
-      setCurrentStep(8);
+      setCurrentStep(6); // Go to confirmation
     }, 2000);
   };
 
@@ -293,24 +300,32 @@ const Index = () => {
     }, 0);
   };
 
-  // Auto-progress from loading step
-  useEffect(() => {
-    if (currentStep === 7) {
-      const timer = setTimeout(() => {
-        setCurrentStep(8);
-      }, 2000);
-      return () => clearTimeout(timer);
+  const getCategoryIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'transportation':
+        return <Car className="w-8 h-8 text-blue-600" />;
+      case 'insurance':
+        return <Shield className="w-8 h-8 text-blue-600" />;
+      case 'comfort':
+        return <Star className="w-8 h-8 text-blue-600" />;
+      case 'esim':
+        return <Wifi className="w-8 h-8 text-blue-600" />;
+      default:
+        return <Star className="w-8 h-8 text-blue-600" />;
     }
-  }, [currentStep]);
+  };
 
   const renderProgressDots = () => {
+    const totalSteps = 4;
+    const currentStepIndex = Math.min(currentStep - 1, totalSteps - 1);
+    
     return (
       <div className="flex justify-center mb-8">
-        {Array.from({ length: 3 }, (_, i) => (
+        {Array.from({ length: totalSteps }, (_, i) => (
           <div
             key={i}
             className={`w-3 h-3 rounded-full mx-1 ${
-              i < Math.min(currentStep - 1, 2) ? 'bg-white' : 'bg-white/30'
+              i <= currentStepIndex ? 'bg-white' : 'bg-white/30'
             }`}
           />
         ))}
@@ -324,7 +339,7 @@ const Index = () => {
       <div className="bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white p-6">
         <div className="flex justify-between items-center max-w-6xl mx-auto">
           <h1 className="text-2xl font-bold">Enhance Your Journey</h1>
-          {(currentStep === 5 || currentStep === 6) && (
+          {(currentStep >= 4) && (
             <div className="text-sm">
               <span className="mr-4">📧 {formData.email}</span>
               <span>✈️ {formData.flightNumber}</span>
@@ -334,7 +349,7 @@ const Index = () => {
       </div>
 
       <div className="max-w-2xl mx-auto px-6 py-12">
-        {currentStep < 8 && renderProgressDots()}
+        {currentStep < 6 && renderProgressDots()}
 
         {/* Step 1: Email Capture */}
         {currentStep === 1 && (
@@ -376,7 +391,7 @@ const Index = () => {
               <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl mx-auto mb-6 flex items-center justify-center">
                 <Ticket className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">Almost There!</h2>
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">Flight Details</h2>
               <p className="text-gray-600 text-lg">Enter your flight number to see available upgrades</p>
             </div>
 
@@ -405,10 +420,9 @@ const Index = () => {
 
               <Button 
                 onClick={handleNext}
-                disabled={isLoading}
                 className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
               >
-                {isLoading ? 'Finding Upgrades...' : 'Find My Upgrades'}
+                Continue
               </Button>
 
               <p className="text-blue-500 text-sm">📄 Example: BA204 or AA1234</p>
@@ -416,71 +430,15 @@ const Index = () => {
           </div>
         )}
 
-        {/* Step 3: Car Transfer Decision */}
+        {/* Step 3: Car Transfer Details */}
         {currentStep === 3 && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
-            <div className="mb-8">
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 shadow-2xl">
+            <div className="mb-8 text-center">
               <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-red-500 rounded-2xl mx-auto mb-6 flex items-center justify-center">
                 <Car className="w-10 h-10 text-white" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">Book a Car Transfer?</h2>
-              <p className="text-gray-600 text-lg">Arrive in style and comfort. Let us arrange a transfer for you.</p>
-            </div>
-
-            <div className="space-y-4 mb-8">
-              <div className="flex justify-center space-x-4 text-sm text-gray-600">
-                <div>
-                  <span className="block text-gray-500 uppercase tracking-wide">EMAIL</span>
-                  <span className="font-medium">{formData.email}</span>
-                </div>
-                <div>
-                  <span className="block text-gray-500 uppercase tracking-wide">FLIGHT</span>
-                  <span className="font-medium">{formData.flightNumber}</span>
-                </div>
-              </div>
-              <div className="text-center space-x-2">
-                <button 
-                  onClick={() => setCurrentStep(1)}
-                  className="text-purple-600 text-sm"
-                >
-                  Change email
-                </button>
-                <button 
-                  onClick={() => setCurrentStep(2)}
-                  className="text-purple-600 text-sm"
-                >
-                  Change flight
-                </button>
-              </div>
-            </div>
-
-            <div className="flex space-x-4">
-              <Button 
-                onClick={() => handleCarTransferDecision(true)}
-                className="flex-1 h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
-              >
-                Yes, Please!
-              </Button>
-              <Button 
-                onClick={() => handleCarTransferDecision(false)}
-                variant="outline"
-                className="flex-1 h-14 text-lg border-2 rounded-2xl"
-              >
-                No, Thanks
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Car Transfer Details */}
-        {currentStep === 4 && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 shadow-2xl">
-            <div className="mb-8 text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-2xl mx-auto mb-6 flex items-center justify-center">
-                <FileText className="w-10 h-10 text-white" />
-              </div>
               <h2 className="text-3xl font-bold text-gray-800 mb-2">Car Transfer Details</h2>
-              <p className="text-gray-600">Please provide the details for your car transfer</p>
+              <p className="text-gray-600">Provide your transfer details for personalized options</p>
             </div>
 
             <div className="space-y-6">
@@ -488,41 +446,31 @@ const Index = () => {
                 <div className="text-center">
                   <span className="block text-gray-500 uppercase tracking-wide">EMAIL</span>
                   <span className="font-medium">{formData.email}</span>
-                  <button 
-                    onClick={() => setCurrentStep(1)}
-                    className="block text-purple-600 text-sm mt-1"
-                  >
-                    Change email
-                  </button>
                 </div>
                 <div className="text-center">
                   <span className="block text-gray-500 uppercase tracking-wide">FLIGHT</span>
                   <span className="font-medium">{formData.flightNumber}</span>
-                  <button 
-                    onClick={() => setCurrentStep(2)}
-                    className="block text-purple-600 text-sm mt-1"
-                  >
-                    Change flight
-                  </button>
                 </div>
               </div>
 
               <div>
+                <Label className="text-purple-600 font-medium">Pickup Address</Label>
                 <Input
-                  placeholder="Pickup Address (e.g., Airport)"
+                  placeholder="e.g., London Heathrow Airport"
                   value={formData.pickupAddress}
                   onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
-                  className="h-12 rounded-xl"
+                  className="h-12 rounded-xl mt-2"
                 />
                 {errors.pickupAddress && <p className="text-red-500 text-sm mt-1">{errors.pickupAddress}</p>}
               </div>
 
               <div>
+                <Label className="text-purple-600 font-medium">Drop-off Address</Label>
                 <Input
-                  placeholder="Drop-off Address"
+                  placeholder="e.g., Hotel or destination address"
                   value={formData.dropoffAddress}
                   onChange={(e) => setFormData({ ...formData, dropoffAddress: e.target.value })}
-                  className="h-12 rounded-xl"
+                  className="h-12 rounded-xl mt-2"
                 />
                 {errors.dropoffAddress && <p className="text-red-500 text-sm mt-1">{errors.dropoffAddress}</p>}
               </div>
@@ -564,8 +512,9 @@ const Index = () => {
               </div>
 
               <div>
+                <Label className="text-purple-600 font-medium">Car Type</Label>
                 <Select value={formData.carType} onValueChange={(value) => setFormData({ ...formData, carType: value })}>
-                  <SelectTrigger className="h-12 rounded-xl">
+                  <SelectTrigger className="h-12 rounded-xl mt-2">
                     <SelectValue placeholder="Choose car type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -579,56 +528,77 @@ const Index = () => {
               </div>
 
               <Button 
-                onClick={fetchRecommendation}
+                onClick={handleNext}
                 disabled={isLoading}
                 className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
               >
-                {isLoading ? 'Finding Upgrades...' : 'Confirm Transfer Details'}
+                {isLoading ? 'Finding Upgrades...' : 'Find My Upgrades'}
               </Button>
             </div>
           </div>
         )}
 
-        {/* Step 5: Dynamic Upgrade Categories */}
-        {currentStep === 5 && recommendation && (
+        {/* Step 4: Upgrade Sections Overview */}
+        {currentStep === 4 && !currentSection && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="mb-8 text-center">
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">Choose Your Upgrades</h2>
+              <p className="text-gray-600">Select from different categories to enhance your journey</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               {getCategories().map(([category, ancillaries]) => (
-                <div key={category} className="text-center">
-                  <h3 className="text-purple-600 font-semibold mb-2 capitalize">{category}</h3>
-                  <p className="text-gray-500 text-sm">{ancillaries.length} item{ancillaries.length !== 1 ? 's' : ''}</p>
-                </div>
+                <Card 
+                  key={category} 
+                  className="p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer"
+                  onClick={() => setCurrentSection(category)}
+                >
+                  <CardContent className="p-0 text-center">
+                    <div className="w-16 h-16 bg-blue-100 rounded-xl mx-auto mb-4 flex items-center justify-center">
+                      {getCategoryIcon(category)}
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-2 capitalize">{category}</h3>
+                    <p className="text-gray-600 text-sm mb-4">{ancillaries.length} item{ancillaries.length !== 1 ? 's' : ''} available</p>
+                    <p className="text-purple-600 font-semibold">Explore →</p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
             
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-gray-500">Total</span>
+                <span className="text-gray-500">Total Selected</span>
                 <p className="text-2xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</p>
               </div>
               <Button 
-                onClick={() => setCurrentStep(6)}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl"
+                onClick={() => setCurrentStep(5)}
+                disabled={formData.selectedUpgrades.length === 0}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
               >
-                View Upgrades
+                Review Order ({formData.selectedUpgrades.length})
               </Button>
             </div>
           </div>
         )}
 
-        {/* Step 6: Specific Upgrades */}
-        {currentStep === 6 && recommendation && (
+        {/* Step 4: Specific Section Items */}
+        {currentStep === 4 && currentSection && recommendation && (
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
-            <Button 
-              onClick={() => setCurrentStep(5)}
-              variant="outline"
-              className="mb-6 rounded-2xl"
-            >
-              ← Back to Categories
-            </Button>
+            <div className="mb-6">
+              <Button 
+                onClick={() => setCurrentSection(null)}
+                variant="outline"
+                className="mb-4 rounded-2xl"
+              >
+                ← Back to Categories
+              </Button>
+              <h2 className="text-2xl font-bold text-gray-800 capitalize">{currentSection}</h2>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {recommendation.ancillaries.map((ancillary) => (
+            <div className="grid grid-cols-1 gap-6 mb-8">
+              {recommendation.ancillaries
+                .filter(item => item.category === currentSection)
+                .map((ancillary) => (
                 <Card 
                   key={ancillary._id}
                   className={`p-6 border-2 hover:border-purple-300 transition-colors cursor-pointer ${
@@ -636,8 +606,8 @@ const Index = () => {
                   }`}
                   onClick={() => handleUpgradeToggle(ancillary._id)}
                 >
-                  <CardContent className="p-0 text-center">
-                    <div className="w-16 h-16 bg-blue-100 rounded-xl mx-auto mb-4 flex items-center justify-center overflow-hidden">
+                  <CardContent className="p-0 flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0">
                       {ancillary.image ? (
                         <img 
                           src={ancillary.image} 
@@ -651,23 +621,19 @@ const Index = () => {
                         />
                       ) : null}
                       <div className={ancillary.image ? 'hidden' : ''}>
-                        {ancillary.category === 'insurance' ? (
-                          <Shield className="w-8 h-8 text-blue-600" />
-                        ) : ancillary.category === 'transportation' ? (
-                          <Car className="w-8 h-8 text-blue-600" />
-                        ) : (
-                          <Star className="w-8 h-8 text-blue-600" />
-                        )}
+                        {getCategoryIcon(ancillary.category)}
                       </div>
                     </div>
-                    <h3 className="font-bold text-gray-800 mb-2">{ancillary.name}</h3>
-                    <p className="text-gray-600 text-sm mb-4">{ancillary.description}</p>
-                    <p className="text-2xl font-bold text-purple-600">${ancillary.price.toFixed(2)}</p>
-                    {formData.selectedUpgrades.includes(ancillary._id) && (
-                      <div className="mt-2">
-                        <span className="text-green-600 font-semibold">✓ Selected</span>
-                      </div>
-                    )}
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-800 mb-2">{ancillary.name}</h3>
+                      <p className="text-gray-600 text-sm">{ancillary.description}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-purple-600">${ancillary.price.toFixed(2)}</p>
+                      {formData.selectedUpgrades.includes(ancillary._id) && (
+                        <span className="text-green-600 font-semibold text-sm">✓ Selected</span>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -675,36 +641,78 @@ const Index = () => {
 
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-gray-500">Total</span>
+                <span className="text-gray-500">Total Selected</span>
                 <p className="text-2xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</p>
               </div>
               <Button 
-                onClick={() => setCurrentStep(7)}
+                onClick={() => setCurrentStep(5)}
                 disabled={formData.selectedUpgrades.length === 0}
                 className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl disabled:bg-gray-400"
               >
-                Complete Order
+                Review Order ({formData.selectedUpgrades.length})
               </Button>
             </div>
           </div>
         )}
 
-        {/* Step 7: Order Processing */}
-        {currentStep === 7 && (
-          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-12 text-center shadow-2xl">
-            <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-gray-600">Processing your order...</p>
-            <Button 
-              onClick={placeOrder}
-              className="mt-6 bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-2xl"
-            >
-              Confirm Order
-            </Button>
+        {/* Step 5: Order Review */}
+        {currentStep === 5 && recommendation && (
+          <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
+            <div className="mb-6">
+              <Button 
+                onClick={() => setCurrentStep(4)}
+                variant="outline"
+                className="mb-4 rounded-2xl"
+              >
+                ← Back to Upgrades
+              </Button>
+              <h2 className="text-2xl font-bold text-gray-800">Review Your Order</h2>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              {formData.selectedUpgrades.map(upgradeId => {
+                const ancillary = recommendation.ancillaries.find(a => a._id === upgradeId);
+                if (!ancillary) return null;
+                
+                return (
+                  <div key={upgradeId} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                    <div>
+                      <h4 className="font-semibold">{ancillary.name}</h4>
+                      <p className="text-sm text-gray-600 capitalize">{ancillary.category}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-purple-600">${ancillary.price.toFixed(2)}</p>
+                      <button 
+                        onClick={() => handleUpgradeToggle(upgradeId)}
+                        className="text-red-500 text-sm hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t pt-6">
+              <div className="flex justify-between items-center mb-6">
+                <span className="text-xl font-semibold">Total</span>
+                <span className="text-3xl font-bold text-purple-600">${calculateTotal().toFixed(2)}</span>
+              </div>
+              
+              <Button 
+                onClick={placeOrder}
+                disabled={isLoading}
+                className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700 rounded-2xl"
+              >
+                {isLoading ? 'Processing Order...' : 'Place Order'}
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Step 8: Order Confirmation */}
-        {currentStep === 8 && (
+        {/* Step 6: Order Confirmation */}
+        {currentStep === 6 && (
           <div className="bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white rounded-3xl p-12 text-center shadow-2xl">
             <div className="mb-8">
               <CheckCircle className="w-20 h-20 text-green-400 mx-auto mb-6" />
@@ -736,11 +744,11 @@ const Index = () => {
             <Button 
               onClick={() => {
                 setCurrentStep(1);
+                setCurrentSection(null);
                 setRecommendation(null);
                 setFormData({
                   email: '',
                   flightNumber: '',
-                  wantsCarTransfer: null,
                   pickupAddress: '',
                   dropoffAddress: '',
                   passengers: '',
